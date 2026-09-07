@@ -1,0 +1,88 @@
+# ============================================================
+# Assembly Fit Risk Prediction – Training Configuration
+# ============================================================
+
+# ----- Data Settings -----
+data:
+  num_points: 2048          # Number of points sampled per assembly
+  num_assemblies_train: 3000  # Number of synthetic assemblies for training
+  num_assemblies_val: 600     # Number of synthetic assemblies for validation
+  num_assemblies_test: 400    # Number of synthetic assemblies for testing
+  data_dir: "data/samples"
+  noise_std: 0.002           # Point position noise std (simulating scanner noise)
+  normal_noise_std: 0.01     # Normal vector noise std
+  assembly_types:            # Which assembly archetypes to generate
+    - shaft_hole
+    - flange_joint
+    - peg_in_hole
+    - dovetail
+
+# ----- Model Settings -----
+model:
+  backbone_type: "pointnet"  # Backbone architecture: "pointnet" (canonical) or "pointnet++"
+  part_embed_dim: 16         # Learnable embedding dim for part_id
+  max_parts: 8               # Maximum number of distinct parts per assembly
+
+  # PointNet Canonical Architecture Properties
+  pointnet:
+    use_tnet_input: true     # Spatial Transformer Network (3x3) for input coordinate alignment
+    use_tnet_feature: true   # Feature Transformer Network (64x64) for feature space alignment
+    point_feat_dim: 256      # Refined local+global point representation dimension
+    global_feat_dim: 1024    # Permutation-invariant global signature dimension
+
+  # Assembly Relationship Module
+  relation:
+    num_heads: 4
+    hidden_dim: 256
+    dropout: 0.1
+    max_attn_points: 128
+
+  # Risk Prediction Head
+  risk_head:
+    shared_dim: 512
+    hidden_dims: [256, 128]
+    dropout: 0.3
+
+# ----- Training Settings -----
+training:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  lr_scheduler: cosine       # Options: cosine, step, plateau
+  lr_step_size: 20
+  lr_gamma: 0.5
+  warmup_epochs: 5
+
+  # Multi-task loss weights (including PointNet orthogonal regularizer)
+  loss_weights:
+    interference: 1.0
+    clearance: 1.0
+    alignment: 1.0
+    failure: 1.5
+    classification: 2.0
+    regularization: 0.001    # PointNet T-Net feature matrix regularizer ||I - A A^T||_F^2
+
+  gradient_clip: 1.0
+  early_stopping_patience: 15
+  save_best: true
+  checkpoint_dir: "checkpoints"
+
+# ----- Evaluation Settings -----
+evaluation:
+  risk_thresholds:
+    low_medium: 0.33
+    medium_high: 0.66
+  metrics:
+    - accuracy
+    - f1_score
+    - roc_auc
+    - rmse
+    - confusion_matrix
+
+# ----- Visualization Settings -----
+visualization:
+  point_size: 3
+  colormap: "Viridis"
+  show_normals: true
+  normal_scale: 0.02
